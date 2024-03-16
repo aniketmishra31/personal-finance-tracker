@@ -1,7 +1,7 @@
 import { type Request, type Response } from "express";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
-import { z } from "zod";
+import { ZodDate, date, z } from "zod";
 import UserModel from "../models/User";
 
 const createToken = (payload: string): string => {
@@ -20,7 +20,7 @@ const getSignupValidatedData = () => {
             username: z.string({ required_error: "Username is required" }),
             password: z.string({ required_error: "Password is required" })
                 .min(8, "Password must be atleast 8 characters long"),
-            dateOfBirth: z.date()
+            dateOfBirth: z.string({ required_error: "Date is required" })
         }
     );
 }
@@ -34,13 +34,14 @@ export const signup = async (req: Request<{}, {}, user>, res: Response) => {
             const { name, email, username, password, dateOfBirth } = signupValidatedData.data;
             const salt = await bcrypt.genSalt();
             const hashPassword = await bcrypt.hash(password, salt);
-
+            console.log(dateOfBirth);
+            const dob=new Date(dateOfBirth);
             const user = new UserModel({
                 name,
                 email,
                 username,
                 password: hashPassword,
-                dateOfBirth
+                dateOfBirth: dob
             });
             const savedUser = await user.save();
             if (!savedUser) {
@@ -50,13 +51,7 @@ export const signup = async (req: Request<{}, {}, user>, res: Response) => {
             if (!token) {
                 throw { status: 500, message: "Error while creating token" };
             }
-            // const resUser = {
-            //     email: savedUser.email,
-            //     username: savedUser.username,
-            //     name: savedUser.name,
-            //     dateOfBirth: savedUser.dateOfBirth
-            // }
-            res.status(201).json(token);
+            res.status(201).json({ accessToken: token });
         }
     } catch (err: any) {
         res
@@ -81,7 +76,7 @@ export const login = async (req: Request<{}, {}, user>, res: Response) => {
         //zod validation
         const loginValidatedData = getLoginValidatedData().safeParse(req.body);
         if (!loginValidatedData.success) {
-            throw { status: 401, message: loginValidatedData.error.issues[0].message };
+            throw { status: 401, message: loginValidatedData.error.issues.map(issue => issue.message) };
         }
         else {
             const { username, password } = loginValidatedData.data;
@@ -98,13 +93,7 @@ export const login = async (req: Request<{}, {}, user>, res: Response) => {
             if (!token) {
                 throw { status: 500, message: "Error while creating token" };
             }
-            // const responseUser = {
-            //     email: user.email,
-            //     username: user.username,
-            //     name: user.name,
-            //     dateOfBirth: user.dateOfBirth
-            // }
-            res.status(200).json(token);
+            res.status(200).json({ accessToken: token });
         }
 
     } catch (err: any) {
